@@ -44,8 +44,7 @@ export class W3mConnectingSiweView extends LitElement {
         justifyContent="space-between"
       >
         <wui-text variant="small-400" align="center" color="fg-200"
-          >Sign this message to prove you own this wallet and proceed. Canceling will disconnect
-          you.</wui-text
+          >Sign this message to prove you own this wallet to proceed.</wui-text
         >
       </wui-flex>
       <wui-flex .padding=${['l', 'xl', 'xl', 'xl'] as const} gap="s" justifyContent="space-between">
