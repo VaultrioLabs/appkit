@@ -5,9 +5,14 @@ export default css`
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-bottom: 10px;
+    box-shadow: -2px 1px 13px -3px rgba(0, 0, 0, 0.6);
   }
   wui-checkbox {
-    padding: var(--wui-spacing-s);
+    width: 100%;
+    padding: var(--wui-spacing-l);
+    background-color: var(--wui-color-bg-150);
+    border-top: 1px solid var(--wui-color-fg-350);
   }
   a {
     text-decoration: none;

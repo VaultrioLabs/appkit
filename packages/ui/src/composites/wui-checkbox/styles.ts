@@ -28,7 +28,7 @@ export default css`
     border-radius: var(--wui-border-radius-3xs);
     border-width: 1px;
     border-style: solid;
-    border-color: var(--wui-color-gray-glass-010);
+    border-color: var(--wui-color-accent-100);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -42,7 +42,7 @@ export default css`
   }
 
   label input[type='checkbox']:checked + span {
-    background-color: var(--wui-color-blue-base-90);
+    background-color: var(--wui-color-accent-glass-080);
   }
 
   label > span > wui-icon {

@@ -29,7 +29,7 @@ describe('W3mLegalCheckbox', () => {
     const checkbox = HelpersUtil.querySelect(element, CHECKBOX_TEST_ID)
     expect(checkbox).toBeDefined()
     expect(HelpersUtil.getTextContent(checkbox)).toBe(
-      'I agree to our terms of service and privacy policy'
+      'I agree to our terms of service and privacy policy.'
     )
   })
 
@@ -65,7 +65,7 @@ describe('W3mLegalCheckbox', () => {
 
     const checkbox = HelpersUtil.querySelect(element, CHECKBOX_TEST_ID)
     expect(checkbox).toBeDefined()
-    expect(HelpersUtil.getTextContent(checkbox)).toBe('I agree to our terms of service')
+    expect(HelpersUtil.getTextContent(checkbox)).toBe('I agree to our terms of service.')
   })
 
   it('it should not return checkbox if both termsConditionsUrl and privacyPolicyUrl are not defined', async () => {

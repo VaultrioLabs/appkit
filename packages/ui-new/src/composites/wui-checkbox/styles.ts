@@ -23,6 +23,7 @@ export default css`
     height: 100%;
     width: 100%;
     border: 1px solid ${({ colors }) => colors.neutrals400};
+    border-color: var(--wui-color-accent-100);
     color: ${({ colors }) => colors.white};
     background-color: transparent;
     will-change: border-color, background-color;
@@ -35,6 +36,7 @@ export default css`
 
   label > input[type='checkbox']:checked + span > wui-icon {
     color: ${({ colors }) => colors.white};
+    background-color: var(--wui-color-accent-glass-080);
   }
 
   label > input[type='checkbox']:not(:checked) > span > wui-icon {
