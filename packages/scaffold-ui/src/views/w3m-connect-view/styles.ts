@@ -43,9 +43,4 @@ export default css`
     pointer-events: none;
     user-select: none;
   }
-
-  .connect.disabled * {
-      backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-  }
 `
