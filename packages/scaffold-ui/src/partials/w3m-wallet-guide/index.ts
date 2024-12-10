@@ -50,7 +50,7 @@ export class W3mWalletGuide extends LitElement {
           >
           <wui-link
             data-testid="w3m-wallet-guide-get-started"
-            color="blue-100"
+            color="wui-color-accent-100"
             class="get-started-link"
             @click=${this.onGetStarted}
             tabIdx=${ifDefined(this.tabIdx)}
