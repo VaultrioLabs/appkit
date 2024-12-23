@@ -33,7 +33,7 @@ export class W3mSIWXSignMessageView extends LitElement {
         justifyContent="space-between"
       >
         <wui-text variant="small-400" align="center" color="fg-200"
-          >Sign this message to prove you own this wallet to proceed.</wui-text
+          >Sign this message to prove you own this wallet and proceed.</wui-text
         >
       </wui-flex>
       <wui-flex .padding=${['l', 'xl', 'xl', 'xl'] as const} gap="s" justifyContent="space-between">
