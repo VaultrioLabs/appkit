@@ -551,6 +551,8 @@ export class EthersAdapter extends AdapterBlueprint {
             await EthersHelpersUtil.addEthereumChain(provider as Provider, caipNetwork)
           } catch (e) {
             console.warn('Could not add chain to wallet', e)
+            //console.warn(caipNetwork)
+            throw new Error('Could not add chain to wallet')
           }
         } else if (
           providerType === 'ANNOUNCED' ||
