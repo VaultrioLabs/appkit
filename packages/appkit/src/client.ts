@@ -757,7 +757,7 @@ export class AppKit {
     return null
   }
 
-  private setUnsupportedNetwork(chainId: string | number) {
+  public setUnsupportedNetwork(chainId: string | number) {
     const namespace = this.getActiveChainNamespace()
 
     if (namespace) {
