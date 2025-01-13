@@ -55,6 +55,11 @@ export type ConnectedWalletInfo = {
   [key: string]: unknown
 }
 
+export type User = {
+  email?: string | null | undefined
+  username?: string | null | undefined
+}
+
 export interface LinkingRecord {
   redirect: string
   href: string
@@ -880,6 +885,8 @@ export type AccountTypeMap = {
     namespace: K
     address: string
     type: NamespaceTypeMap[K]
+    publicKey?: K extends 'bip122' ? string : never
+    path?: K extends 'bip122' ? string : never
   }
 }
 
@@ -1090,9 +1097,15 @@ export type FeaturesKeys = keyof Features
 export type WalletGuideType = 'get-started' | 'explore'
 
 export type UseAppKitAccountReturn = {
+  allAccounts: AccountType[]
   caipAddress: CaipAddress | undefined
   address: string | undefined
   isConnected: boolean
+  embeddedWalletInfo?: {
+    user: AccountControllerState['user']
+    accountType: W3mFrameTypes.AccountType | undefined
+    isSmartAccountDeployed: boolean
+  }
   status: AccountControllerState['status']
 }
 
