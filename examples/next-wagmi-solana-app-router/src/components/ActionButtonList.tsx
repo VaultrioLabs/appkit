@@ -1,8 +1,10 @@
 'use client'
 
-import { useAppKit, useDisconnect, useAppKitNetwork, useAppKitTheme } from '@/config'
-import { mainnet } from '@reown/appkit/networks'
 import { useTheme } from 'next-themes'
+
+import { mainnet } from '@reown/appkit/networks'
+
+import { useAppKit, useAppKitNetwork, useAppKitTheme, useDisconnect } from '@/config'
 
 export function ActionButtonList() {
   const modal = useAppKit()
@@ -17,6 +19,14 @@ export function ActionButtonList() {
 
   function switchToNetwork() {
     switchNetwork(mainnet)
+  }
+
+  function connectToSolana() {
+    modal.open({ view: 'Connect', namespace: 'solana' })
+  }
+
+  function connectToEthereum() {
+    modal.open({ view: 'Connect', namespace: 'eip155' })
   }
 
   async function handleDisconnect() {
@@ -38,6 +48,8 @@ export function ActionButtonList() {
       <button onClick={openAppKit}>Open</button>
       <button onClick={handleDisconnect}>Disconnect</button>
       <button onClick={switchToNetwork}>Switch to Ethereum</button>
+      <button onClick={connectToSolana}>Connect to Solana</button>
+      <button onClick={connectToEthereum}>Connect to Ethereum</button>
       <button onClick={toggleTheme}>
         {themeMode === 'light' ? (
           <svg

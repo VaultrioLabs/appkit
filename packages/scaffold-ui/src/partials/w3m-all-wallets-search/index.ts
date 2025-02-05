@@ -1,10 +1,19 @@
-import type { BadgeType, WcWallet } from '@reown/appkit-core'
-import { ApiController, ConnectorController, RouterController } from '@reown/appkit-core'
-import { customElement } from '@reown/appkit-ui'
 import { LitElement, html } from 'lit'
 import { property, state } from 'lit/decorators.js'
-import styles from './styles.js'
+
+import { ConstantsUtil } from '@reown/appkit-common'
+import type { BadgeType, WcWallet } from '@reown/appkit-core'
+import {
+  ApiController,
+  ChainController,
+  ConnectorController,
+  RouterController
+} from '@reown/appkit-core'
+import { customElement } from '@reown/appkit-ui'
+import { MobileWalletUtil } from '@reown/appkit-utils'
+
 import { WalletUtil } from '../../utils/WalletUtil.js'
+import styles from './styles.js'
 
 @customElement('w3m-all-wallets-search')
 export class W3mAllWalletsSearch extends LitElement {
@@ -48,7 +57,13 @@ export class W3mAllWalletsSearch extends LitElement {
 
     if (!search.length) {
       return html`
-        <wui-flex justifyContent="center" alignItems="center" gap="s" flexDirection="column">
+        <wui-flex
+          data-testid="no-wallet-found"
+          justifyContent="center"
+          alignItems="center"
+          gap="s"
+          flexDirection="column"
+        >
           <wui-icon-box
             size="lg"
             iconColor="fg-200"
@@ -56,13 +71,16 @@ export class W3mAllWalletsSearch extends LitElement {
             icon="wallet"
             background="transparent"
           ></wui-icon-box>
-          <wui-text color="fg-200" variant="paragraph-500">No Wallet found</wui-text>
+          <wui-text data-testid="no-wallet-found-text" color="fg-200" variant="paragraph-500">
+            No Wallet found
+          </wui-text>
         </wui-flex>
       `
     }
 
     return html`
       <wui-grid
+        data-testid="wallet-list"
         .padding=${['0', 's', 's', 's'] as const}
         rowGap="l"
         columnGap="xs"
@@ -83,6 +101,18 @@ export class W3mAllWalletsSearch extends LitElement {
 
   private onConnectWallet(wallet: WcWallet) {
     const connector = ConnectorController.getConnector(wallet.id, wallet.rdns)
+
+    if (ChainController.state.activeChain === ConstantsUtil.CHAIN.SOLANA) {
+      /**
+       * Universal Links requires explicit user interaction to open the wallet app.
+       * Previously we've been calling this with the life-cycle methods in the Solana clients by listening the SELECT_WALLET event of EventController.
+       * But this breaks the UL functionality for some wallets like Phantom.
+       */
+      MobileWalletUtil.handleMobileWalletRedirection({
+        name: connector?.name || wallet?.name || ''
+      })
+    }
+
     if (connector) {
       RouterController.push('ConnectingExternal', { connector })
     } else {

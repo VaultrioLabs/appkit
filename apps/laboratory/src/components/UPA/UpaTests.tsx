@@ -1,12 +1,8 @@
-import { useAppKitNetwork } from '@reown/appkit/react'
+import { Box, Card, CardBody, CardHeader, Heading, Stack, StackDivider } from '@chakra-ui/react'
 
-import { StackDivider, Card, CardHeader, Heading, CardBody, Box, Stack } from '@chakra-ui/react'
-import { UpaEvmSignMessageTest } from './UpaEvmSignMessageTest'
-import { UpaSolanaSignMessageTest } from './UpaSolanaSignMessageTest'
+import { UpaSignMessageTest } from './UpaSignMessageTest'
 
 export function UpaTests() {
-  const { caipNetwork } = useAppKitNetwork()
-
   return (
     <Card marginTop={10} marginBottom={10}>
       <CardHeader>
@@ -18,11 +14,7 @@ export function UpaTests() {
             <Heading size="xs" textTransform="uppercase" pb="2">
               Sign Message
             </Heading>
-            {caipNetwork?.chainNamespace === 'eip155' ? (
-              <UpaEvmSignMessageTest />
-            ) : (
-              <UpaSolanaSignMessageTest />
-            )}
+            <UpaSignMessageTest />
           </Box>
         </Stack>
       </CardBody>

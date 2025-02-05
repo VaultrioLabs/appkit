@@ -1,5 +1,7 @@
-import { subscribeKey as subKey } from 'valtio/vanilla/utils'
 import { proxy } from 'valtio/vanilla'
+import { subscribeKey as subKey } from 'valtio/vanilla/utils'
+
+import { AssetUtil } from '../utils/AssetUtil.js'
 import { CoreHelperUtil } from '../utils/CoreHelperUtil.js'
 import { FetchUtil } from '../utils/FetchUtil.js'
 import { StorageUtil } from '../utils/StorageUtil.js'
@@ -10,10 +12,10 @@ import type {
   WcWallet
 } from '../utils/TypeUtil.js'
 import { AssetController } from './AssetController.js'
-import { ConnectorController } from './ConnectorController.js'
-import { OptionsController } from './OptionsController.js'
 import { ChainController } from './ChainController.js'
+import { ConnectorController } from './ConnectorController.js'
 import { EventsController } from './EventsController.js'
+import { OptionsController } from './OptionsController.js'
 
 // -- Helpers ------------------------------------------- //
 const baseUrl = CoreHelperUtil.getApiUrl()
@@ -105,10 +107,14 @@ export const ApiController = {
     AssetController.setTokenImage(symbol, URL.createObjectURL(blob))
   },
 
-  async fetchNetworkImages() {
+  async prefetchNetworkImages() {
     const requestedCaipNetworks = ChainController.getAllRequestedCaipNetworks()
 
-    const ids = requestedCaipNetworks?.map(({ assets }) => assets?.imageId).filter(Boolean)
+    const ids = requestedCaipNetworks
+      ?.map(({ assets }) => assets?.imageId)
+      .filter(Boolean)
+      .filter(imageId => !AssetUtil.getNetworkImageById(imageId))
+
     if (ids) {
       await Promise.allSettled((ids as string[]).map(id => ApiController._fetchNetworkImage(id)))
     }
@@ -264,24 +270,20 @@ export const ApiController = {
     state.search = ApiController._filterOutExtensions(data)
   },
 
-  async reFetchWallets() {
-    state.page = 1
-    state.wallets = []
-    await ApiController.fetchFeaturedWallets()
-    await ApiController.fetchRecommendedWallets()
-  },
-
-  prefetch() {
+  prefetchWalletImages() {
     const promises = [
       ApiController.fetchFeaturedWallets(),
       ApiController.fetchRecommendedWallets(),
-      ApiController.fetchNetworkImages(),
       ApiController.fetchConnectorImages()
     ]
+
+    state.prefetchPromise = Promise.allSettled(promises)
+  },
+
+  prefetchAnalyticsConfig() {
     if (OptionsController.state.features?.analytics) {
-      promises.push(ApiController.fetchAnalyticsConfig())
+      ApiController.fetchAnalyticsConfig()
     }
-    state.prefetchPromise = Promise.race([Promise.allSettled(promises)])
   },
 
   async fetchAnalyticsConfig() {

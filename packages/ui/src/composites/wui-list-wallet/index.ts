@@ -1,16 +1,17 @@
-import { html, LitElement } from 'lit'
+import { LitElement, html } from 'lit'
 import { property } from 'lit/decorators.js'
+import { ifDefined } from 'lit/directives/if-defined.js'
+
 import '../../components/wui-icon/index.js'
-import '../../composites/wui-icon-box/index.js'
 import '../../components/wui-text/index.js'
+import '../../composites/wui-icon-box/index.js'
 import { elementStyles, resetStyles } from '../../utils/ThemeUtil.js'
-import type { IconType, IWalletImage, TagType } from '../../utils/TypeUtil.js'
+import type { IWalletImage, IconType, TagType } from '../../utils/TypeUtil.js'
 import { customElement } from '../../utils/WebComponentsUtil.js'
 import '../wui-all-wallets-image/index.js'
 import '../wui-tag/index.js'
 import '../wui-wallet-image/index.js'
 import styles from './styles.js'
-import { ifDefined } from 'lit/directives/if-defined.js'
 
 @customElement('wui-list-wallet')
 export class WuiListWallet extends LitElement {
@@ -42,7 +43,7 @@ export class WuiListWallet extends LitElement {
   // -- Render -------------------------------------------- //
   public override render() {
     return html`
-      <button ?disabled=${this.disabled} tabindex=${ifDefined(this.tabIdx)} ontouchstart>
+      <button ?disabled=${this.disabled} tabindex=${ifDefined(this.tabIdx)}>
         ${this.templateAllWallets()} ${this.templateWalletImage()}
         <wui-text variant="paragraph-500" color="inherit">${this.name}</wui-text>
         ${this.templateStatus()}

@@ -1,6 +1,7 @@
-import type { AppKit } from '@reown/appkit'
-import { mainnet, type Chain } from '@reown/appkit/networks'
 import { vi } from 'vitest'
+
+import type { AppKit } from '@reown/appkit'
+import { type Chain, mainnet } from '@reown/appkit/networks'
 
 export const mockCaipNetworks = [mainnet] as [Chain, ...Chain[]]
 export const mockAddress = '0xf5B035287c1465F29C7e08FbB5c3b8a4975Bf831'
@@ -60,7 +61,6 @@ export const mockAppKit = {
   open: vi.fn(),
   isOpen: vi.fn().mockReturnValue(false),
   isTransactionStackEmpty: vi.fn().mockReturnValue(true),
-  isTransactionShouldReplaceView: vi.fn().mockReturnValue(false),
   replace: vi.fn(),
   redirect: vi.fn(),
   showErrorMessage: vi.fn(),
