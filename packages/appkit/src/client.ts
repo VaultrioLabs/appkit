@@ -11,9 +11,12 @@ import {
   ConstantsUtil,
   NetworkUtil,
   ParseUtil,
+  SafeLocalStorage,
+  SafeLocalStorageKeys,
   getW3mThemeVariables
 } from '@reown/appkit-common'
 import {
+  type AccountControllerState,
   type ChainAdapter,
   type ConnectMethod,
   type ConnectedWalletInfo,
@@ -216,7 +219,7 @@ export class AppKit {
       ConnectorController.setFilterByNamespace(options.namespace)
     }
 
-    ModalController.open(options)
+    await ModalController.open(options)
   }
 
   public async close() {
@@ -299,29 +302,40 @@ export class AppKit {
     return AccountController.state.connectedWalletInfo
   }
 
-  public subscribeAccount(callback: (newState: UseAppKitAccountReturn) => void) {
+  public subscribeAccount(
+    callback: (newState: UseAppKitAccountReturn) => void,
+    namespace?: ChainNamespace
+  ) {
     function updateVal() {
-      const authConnector = ConnectorController.getAuthConnector()
+      const authConnector = ConnectorController.getAuthConnector(namespace)
+      const accountState = ChainController.getAccountDataByChainNamespace(namespace)
+
+      if (!accountState) {
+        return
+      }
 
       callback({
-        allAccounts: AccountController.state.allAccounts,
-        caipAddress: ChainController.state.activeCaipAddress,
-        address: CoreHelperUtil.getPlainAddress(ChainController.state.activeCaipAddress),
-        isConnected: Boolean(ChainController.state.activeCaipAddress),
-        status: AccountController.state.status,
+        allAccounts: accountState.allAccounts,
+        caipAddress: accountState.caipAddress,
+        address: CoreHelperUtil.getPlainAddress(accountState.caipAddress),
+        isConnected: Boolean(accountState.caipAddress),
+        status: accountState.status,
         embeddedWalletInfo: authConnector
           ? {
-              user: AccountController.state.user,
-              authProvider: AccountController.state.socialProvider || 'email',
-              accountType: AccountController.state.preferredAccountType,
-              isSmartAccountDeployed: Boolean(AccountController.state.smartAccountDeployed)
+              user: accountState.user,
+              authProvider: accountState.socialProvider || 'email',
+              accountType: accountState.preferredAccountType,
+              isSmartAccountDeployed: Boolean(accountState.smartAccountDeployed)
             }
           : undefined
       })
     }
 
-    ChainController.subscribe(updateVal)
-    AccountController.subscribe(updateVal)
+    if (namespace) {
+      ChainController.subscribeChainProp('accountState', updateVal, namespace)
+    } else {
+      ChainController.subscribe(updateVal)
+    }
     ConnectorController.subscribe(updateVal)
   }
 
@@ -462,8 +476,11 @@ export class AppKit {
     AccountController.setProfileImage(profileImage, chain)
   }
 
-  public setUser: (typeof AccountController)['setUser'] = user => {
-    AccountController.setUser(user)
+  public setUser: (typeof AccountController)['setUser'] = (user, chain) => {
+    AccountController.setUser(user, chain)
+    if (OptionsController.state.enableEmbedded) {
+      ModalController.close()
+    }
   }
 
   public resetAccount: (typeof AccountController)['resetAccount'] = (chain: ChainNamespace) => {
@@ -968,7 +985,7 @@ export class AppKit {
 
         StorageUtil.removeConnectedNamespace(namespace)
         ProviderUtil.resetChain(namespace)
-        this.setUser(undefined)
+        this.setUser(undefined, namespace)
         this.setStatus('disconnected', namespace)
       },
       checkInstalled: (ids?: string[]) => {
@@ -1214,16 +1231,13 @@ export class AppKit {
       if (isSafeRequest) {
         return
       }
+      if (AccountController.state.address && ChainController.state.activeCaipNetwork?.id) {
+        this.updateNativeBalance()
+      }
       if (this.isTransactionStackEmpty()) {
         this.close()
-        if (AccountController.state.address && ChainController.state.activeCaipNetwork?.id) {
-          this.updateNativeBalance()
-        }
       } else {
         this.popTransactionStack()
-        if (AccountController.state.address && ChainController.state.activeCaipNetwork?.id) {
-          this.updateNativeBalance()
-        }
       }
     })
     provider.onNotConnected(() => {
@@ -1244,6 +1258,7 @@ export class AppKit {
           ? (`eip155:${user.chainId}:${user.address}` as CaipAddress)
           : (`${user.chainId}:${user.address}` as CaipAddress)
       this.setSmartAccountDeployed(Boolean(user.smartAccountDeployed), namespace)
+
       if (!HelpersUtil.isLowerCaseMatch(user.address, AccountController.state.address)) {
         this.syncIdentity({
           address: user.address,
@@ -1251,9 +1266,9 @@ export class AppKit {
           chainNamespace: namespace
         })
       }
-      this.setCaipAddress(caipAddress, namespace)
 
-      this.setUser({ ...(AccountController.state.user || {}), email: user.email })
+      this.setCaipAddress(caipAddress, namespace)
+      this.setUser({ ...(AccountController.state.user || {}), email: user.email }, namespace)
 
       const preferredAccountType = (user.preferredAccountType ||
         OptionsController.state.defaultAccountTypes[namespace]) as W3mFrameTypes.AccountType
@@ -1278,7 +1293,10 @@ export class AppKit {
       this.setLoading(false)
     })
     provider.onSocialConnected(({ userName }) => {
-      this.setUser({ ...(AccountController.state.user || {}), username: userName })
+      this.setUser(
+        { ...(AccountController.state.user || {}), username: userName },
+        ChainController.state.activeChain
+      )
     })
     provider.onGetSmartAccountEnabledNetworks(networks => {
       this.setSmartAccountEnabledNetworks(
@@ -1309,7 +1327,10 @@ export class AppKit {
     const email = provider.getEmail()
     const username = provider.getUsername()
 
-    this.setUser({ ...(AccountController.state?.user || {}), username, email })
+    this.setUser(
+      { ...(AccountController.state?.user || {}), username, email },
+      ChainController.state.activeChain
+    )
 
     this.setupAuthConnectorListeners(provider)
 
@@ -1407,9 +1428,15 @@ export class AppKit {
     }
 
     const connectionStatus = StorageUtil.getConnectionStatus()
-
     if (connectionStatus === 'connected') {
       this.setStatus('connecting', chainNamespace)
+    } else if (connectionStatus === 'disconnected') {
+      /*
+       * Address cache is kept after disconnecting from the wallet
+       * but should be cleared if appkit is launched in disconnected state
+       */
+      StorageUtil.clearAddressCache()
+      this.setStatus(connectionStatus, chainNamespace)
     } else {
       this.setStatus(connectionStatus, chainNamespace)
     }
@@ -1564,7 +1591,6 @@ export class AppKit {
         }
 
         this.syncWalletConnectAccounts(chainNamespace)
-
         await this.syncAccount({
           address,
           chainId,
@@ -1629,11 +1655,6 @@ export class AppKit {
       'supportsAllNetworks',
       chainNamespace
     )
-    // Only update state when needed
-    if (!HelpersUtil.isLowerCaseMatch(address, AccountController.state.address)) {
-      this.setCaipAddress(`${chainNamespace}:${chainId}:${address}`, chainNamespace)
-      await this.syncIdentity({ address, chainId, chainNamespace })
-    }
 
     this.setStatus('connected', chainNamespace)
 
@@ -1646,7 +1667,7 @@ export class AppKit {
       let fallbackCaipNetwork = this.caipNetworks?.find(n => n.chainNamespace === chainNamespace)
 
       // If doesn't support all networks, we need to use approved networks
-      if (!shouldSupportAllNetworks) {
+      if (!shouldSupportAllNetworks && !caipNetwork && !fallbackCaipNetwork) {
         // Connection can be requested for a chain that is not supported by the wallet so we need to use approved networks here
         const caipNetworkIds = this.getApprovedCaipNetworkIds() || []
         const caipNetworkId = caipNetworkIds.find(
@@ -1668,10 +1689,27 @@ export class AppKit {
       const network = caipNetwork || fallbackCaipNetwork
 
       if (network?.chainNamespace === ChainController.state.activeChain) {
-        this.setCaipNetwork(network)
+        // If the network is unsupported and the user doesn't allow unsupported chains, we show the unsupported chain UI
+        if (
+          !OptionsController.state.allowUnsupportedChain &&
+          ChainController.state.activeCaipNetwork?.name === ConstantsUtil.UNSUPPORTED_NETWORK_NAME
+        ) {
+          ChainController.showUnsupportedChainUI()
+        } else {
+          this.setCaipNetwork(network)
+        }
       }
       this.syncConnectedWalletInfo(chainNamespace)
 
+      // Only update state when needed
+      if (!HelpersUtil.isLowerCaseMatch(address, AccountController.state.address)) {
+        this.setCaipAddress(`${chainNamespace}:${network?.id}:${address}`, chainNamespace)
+        await this.syncIdentity({
+          address,
+          chainId: network?.id as string | number,
+          chainNamespace
+        })
+      }
       await this.syncBalance({ address, chainId: network?.id, chainNamespace })
     }
   }
@@ -1690,31 +1728,7 @@ export class AppKit {
       return
     }
 
-    const isApiBalanceSupported = CoreConstantsUtil.BALANCE_SUPPORTED_CHAINS.includes(
-      caipNetwork?.chainNamespace
-    )
-
-    if (caipNetwork.testnet || !isApiBalanceSupported) {
-      await this.updateNativeBalance()
-
-      return
-    }
-
-    const balances = await AccountController.fetchTokenBalance(() =>
-      this.setBalance('0.00', caipNetwork.nativeCurrency.symbol, caipNetwork.chainNamespace)
-    )
-
-    const balance = balances.find(
-      b =>
-        b.chainId === `${params.chainNamespace}:${params.chainId}` &&
-        b.symbol === caipNetwork.nativeCurrency.symbol
-    )
-
-    this.setBalance(
-      balance?.quantity?.numeric || '0.00',
-      caipNetwork.nativeCurrency.symbol,
-      params.chainNamespace
-    )
+    await this.updateNativeBalance()
   }
 
   private syncConnectedWalletInfo(chainNamespace: ChainNamespace) {
@@ -1861,7 +1875,6 @@ export class AppKit {
 
         this.syncProvider({ ...connection, chainNamespace: namespace })
         await this.syncAccount({ ...connection, chainNamespace: namespace })
-
         this.setStatus('connected', namespace)
       } else {
         this.setStatus('disconnected', namespace)
@@ -2010,6 +2023,7 @@ export class AppKit {
         }
       })
       this.syncAuthConnector(this.authProvider)
+      this.checkExistingSocialConnection()
     }
   }
 
@@ -2126,16 +2140,25 @@ export class AppKit {
   }
 
   private getDefaultNetwork() {
-    const caipNetworkId = StorageUtil.getActiveCaipNetworkId()
+    const caipNetworkIdFromStorage = StorageUtil.getActiveCaipNetworkId()
 
-    if (caipNetworkId) {
-      const caipNetwork = this.caipNetworks?.find(n => n.caipNetworkId === caipNetworkId)
+    if (caipNetworkIdFromStorage) {
+      const caipNetwork = this.caipNetworks?.find(n => n.caipNetworkId === caipNetworkIdFromStorage)
 
       if (caipNetwork) {
         return caipNetwork
       }
 
-      return this.getUnsupportedNetwork(caipNetworkId)
+      if (this.defaultCaipNetwork) {
+        // It's still a case that the network in storage might not be found in the networks array
+        return this.defaultCaipNetwork
+      }
+
+      return this.getUnsupportedNetwork(caipNetworkIdFromStorage)
+    }
+
+    if (this.defaultCaipNetwork) {
+      return this.defaultCaipNetwork
     }
 
     return this.caipNetworks?.[0]
@@ -2158,5 +2181,62 @@ export class AppKit {
     }
 
     return this.initPromise
+  }
+
+  private async checkExistingSocialConnection() {
+    try {
+      if (!CoreHelperUtil.isTelegram()) {
+        return
+      }
+      const socialProviderToConnect = SafeLocalStorage.getItem(
+        SafeLocalStorageKeys.SOCIAL_PROVIDER
+      ) as AccountControllerState['socialProvider']
+      if (!socialProviderToConnect) {
+        return
+      }
+      if (typeof window === 'undefined' || typeof document === 'undefined') {
+        return
+      }
+      const url = new URL(window.location.href)
+      const resultUri = url.searchParams.get('result_uri')
+      if (!resultUri) {
+        return
+      }
+      AccountController.setSocialProvider(
+        socialProviderToConnect,
+        ChainController.state.activeChain
+      )
+      await this.authProvider?.init()
+      const authConnector = ConnectorController.getAuthConnector()
+      if (socialProviderToConnect && authConnector) {
+        this.setLoading(true)
+
+        await authConnector.provider.connectSocial(resultUri)
+        await ConnectionController.connectExternal(authConnector, authConnector.chain)
+        StorageUtil.setConnectedSocialProvider(socialProviderToConnect)
+        SafeLocalStorage.removeItem(SafeLocalStorageKeys.SOCIAL_PROVIDER)
+
+        EventsController.sendEvent({
+          type: 'track',
+          event: 'SOCIAL_LOGIN_SUCCESS',
+          properties: { provider: socialProviderToConnect }
+        })
+      }
+    } catch (error) {
+      this.setLoading(false)
+      // eslint-disable-next-line no-console
+      console.error('checkExistingSocialConnection error', error)
+    }
+
+    try {
+      const url = new URL(window.location.href)
+      // Remove the 'result_uri' parameter
+      url.searchParams.delete('result_uri')
+      // Update the URL without reloading the page
+      window.history.replaceState({}, document.title, url.toString())
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('tma social login failed', error)
+    }
   }
 }
