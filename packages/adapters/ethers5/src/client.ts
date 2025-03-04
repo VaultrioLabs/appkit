@@ -4,7 +4,7 @@ import { formatEther } from 'ethers/lib/utils.js'
 
 import { type AppKitOptions, WcConstantsUtil } from '@reown/appkit'
 import type { CaipNetwork } from '@reown/appkit-common'
-import { ConstantsUtil as CommonConstantsUtil } from '@reown/appkit-common'
+import { ConstantsUtil as CommonConstantsUtil, ParseUtil } from '@reown/appkit-common'
 import {
   type CombinedProvider,
   type Connector,
@@ -31,6 +31,7 @@ export interface EIP6963ProviderDetail {
 export class Ethers5Adapter extends AdapterBlueprint {
   private ethersConfig?: ProviderType
   public adapterType = 'ethers'
+  private balancePromises: Record<string, Promise<AdapterBlueprint.GetBalanceResult>> = {}
 
   constructor() {
     super({})
@@ -155,10 +156,11 @@ export class Ethers5Adapter extends AdapterBlueprint {
       throw new Error('Provider is undefined')
     }
 
+    const { address } = ParseUtil.parseCaipAddress(params.caipAddress)
     const result = await Ethers5Methods.writeContract(
       params,
       params.provider as Provider,
-      params.caipAddress,
+      address,
       Number(params.caipNetwork?.id)
     )
 
@@ -462,6 +464,18 @@ export class Ethers5Adapter extends AdapterBlueprint {
     const caipNetwork = this.caipNetworks?.find((c: CaipNetwork) => c.id === params.chainId)
 
     if (caipNetwork) {
+      const caipAddress = `${caipNetwork.caipNetworkId}:${params.address}`
+
+      const cachedPromise = this.balancePromises[caipAddress]
+      if (cachedPromise) {
+        return cachedPromise
+      }
+
+      const cachedBalance = StorageUtil.getNativeBalanceCacheForCaipAddress(caipAddress)
+      if (cachedBalance) {
+        return { balance: cachedBalance.balance, symbol: cachedBalance.symbol }
+      }
+
       const jsonRpcProvider = new ethers.providers.JsonRpcProvider(
         caipNetwork.rpcUrls.default.http[0],
         {
@@ -470,25 +484,28 @@ export class Ethers5Adapter extends AdapterBlueprint {
         }
       )
 
-      const caipAddress = `${caipNetwork.caipNetworkId}:${params.address}`
-      const cachedBalance = StorageUtil.getNativeBalanceCacheForCaipAddress(caipAddress)
-      if (cachedBalance) {
-        return { balance: cachedBalance.balance, symbol: cachedBalance.symbol }
-      }
-
       if (jsonRpcProvider) {
         try {
-          const balance = await jsonRpcProvider.getBalance(params.address)
-          const formattedBalance = formatEther(balance)
+          this.balancePromises[caipAddress] = new Promise<AdapterBlueprint.GetBalanceResult>(
+            async resolve => {
+              const balance = await jsonRpcProvider.getBalance(params.address)
+              const formattedBalance = formatEther(balance)
 
-          StorageUtil.updateNativeBalanceCache({
-            caipAddress,
-            balance: formattedBalance,
-            symbol: caipNetwork.nativeCurrency.symbol,
-            timestamp: Date.now()
+              StorageUtil.updateNativeBalanceCache({
+                caipAddress,
+                balance: formattedBalance,
+                symbol: caipNetwork.nativeCurrency.symbol,
+                timestamp: Date.now()
+              })
+
+              resolve({ balance: formattedBalance, symbol: caipNetwork.nativeCurrency.symbol })
+            }
+          ).finally(() => {
+            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+            delete this.balancePromises[caipAddress]
           })
 
-          return { balance: formattedBalance, symbol: caipNetwork.nativeCurrency.symbol }
+          return this.balancePromises[caipAddress] || { balance: '', symbol: '' }
         } catch (error) {
           return { balance: '', symbol: '' }
         }
@@ -579,6 +596,7 @@ export class Ethers5Adapter extends AdapterBlueprint {
     } catch (switchError: any) {
       if (
         switchError.code === WcConstantsUtil.ERROR_CODE_UNRECOGNIZED_CHAIN_ID ||
+        switchError.code === WcConstantsUtil.ERROR_INVALID_CHAIN_ID ||
         switchError.code === WcConstantsUtil.ERROR_CODE_DEFAULT ||
         switchError?.data?.originalError?.code === WcConstantsUtil.ERROR_CODE_UNRECOGNIZED_CHAIN_ID
       ) {
@@ -657,5 +675,20 @@ export class Ethers5Adapter extends AdapterBlueprint {
     }
 
     return await provider.request({ method: 'wallet_revokePermissions', params: [params] })
+  }
+
+  public async walletGetAssets(
+    params: AdapterBlueprint.WalletGetAssetsParams
+  ): Promise<AdapterBlueprint.WalletGetAssetsResponse> {
+    const provider = ProviderUtil.getProvider(CommonConstantsUtil.CHAIN.EVM)
+
+    if (!provider) {
+      throw new Error('Provider is undefined')
+    }
+
+    return await provider.request({
+      method: 'wallet_getAssets',
+      params: [params]
+    })
   }
 }
